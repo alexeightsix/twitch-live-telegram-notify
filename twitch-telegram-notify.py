@@ -3,10 +3,10 @@ import json
 import urllib.parse
 import time
 import sys
-
+import os
 
 class twitch_client():
-    def __init__(self, client_id, client_secret, redirect_uri):
+    def __init__(self, client_id, client_secret, redirect_uri, file):
         self.api_endpoint = 'https://api.twitch.tv'
         self.auth_endpoint = 'https://id.twitch.tv/oauth2/token'
         self.redirect_uri = redirect_uri
@@ -14,10 +14,11 @@ class twitch_client():
         self.client_secret = client_secret
         self.http = requests
         self.token = {}
+        self.file_loc = file
 
     def load_token(self):
         try:
-            f = '.twitch_token.json'
+            f = self.file_loc
             file = filehandle = open(f, mode='r', encoding='utf-8')
             token = json.loads(file.read())
             file.close()
@@ -27,14 +28,14 @@ class twitch_client():
             return None
 
     @staticmethod
-    def update_token(token):
-        file = filehandle = open('.twitch_token.json',
+    def update_token(token, file):
+        file = filehandle = open(file,
                                  mode='w', encoding='utf-8')
 
         token['expires_at'] = time.time() + token['expires_in']
         file.write(json.dumps(token))
-        file.close()
 
+        file.close()
 
     def get_access_token(self, code):
         params = {
@@ -51,7 +52,7 @@ class twitch_client():
             raise BaseException(r.json())
 
         token = r.json()
-        self.update_token(token)
+        self.update_token(token, self.file_loc)
         return token
 
     def prompt_for_code(self):
@@ -91,7 +92,7 @@ class twitch_client():
             raise BaseException(r.json())
 
         token = r.json()
-        self.update_token(token)
+        self.update_token(token, self.file_loc)
 
     def call(self, endpoint, params={}, method='GET'):
         url = self.api_endpoint + '/' + endpoint
@@ -119,27 +120,14 @@ class twitch_client():
 
 
 class twitch_api():
-    def __init__(self, client_id, client_secret, redirect_uri):
-        self.client = twitch_client(client_id, client_secret, redirect_uri)
+    def __init__(self, client_id, client_secret, redirect_uri, file):
+        self.client = twitch_client(client_id, client_secret, redirect_uri, file)
 
     def get_user_followed_streams(self, user_id):
         return self.client.call('helix/streams/followed', {'user_id': user_id})
 
     def get_user(self, login):
         return self.client.call('helix/users', {'login': login})['data'][0]
-
-
-def config():
-    cfg = filehandle = open('config.json', mode="r", encoding="utf-8")
-    data = json.loads(cfg.read())
-    cfg.close()
-    return data
-
-
-cfg = config()
-api = twitch_api(cfg['twitch_client_id'], cfg['twitch_client_secret'], cfg['twitch_redirect_uri'])
-user = api.get_user(cfg['twitch_user_name'])
-followed = api.get_user_followed_streams(user['id'])
 
 
 def telegram_push(chat_id, u):
@@ -151,6 +139,13 @@ def telegram_push(chat_id, u):
     ).json()
 
 
+def config(loc):
+    cfg = filehandle = open(loc, mode="r", encoding="utf-8")
+    data = json.loads(cfg.read())
+    cfg.close()
+    return data
+
+
 def is_processed(u, posts):
     for p in posts:
         if p['started_at'] == u['started_at']:
@@ -158,21 +153,30 @@ def is_processed(u, posts):
     return False
 
 
-def get_processed_posts():
-    db = filehandle = open('.processed.json', mode="r", encoding="utf-8")
+def get_processed_posts(file):
+    db = filehandle = open(file, mode="r", encoding="utf-8")
     processed = json.loads(db.read())['processed']
     db.close()
     return processed
 
 
-def update_db(contents):
+def update_db(contents, file):
     data = json.dumps({"processed": contents})
-    db = filehandle = open('.processed.json', mode="w", encoding="utf-8")
+    db = filehandle = open(file, mode="w", encoding="utf-8")
     db.write(data)
     db.close()
 
 
-processed = get_processed_posts()
+root = os.path.dirname(os.path.realpath(__file__))
+
+cfg = config(root + '/config.json')
+api = twitch_api(cfg['twitch_client_id'],
+                 cfg['twitch_client_secret'], cfg['twitch_redirect_uri'], root + '/.twitch_token.json')
+user = api.get_user(cfg['twitch_user_name'])
+followed = api.get_user_followed_streams(user['id'])
+processed_file = root + '/.processed.json'
+processed = get_processed_posts(processed_file)
+
 
 if len(followed['data']) < 1:
     sys.exit(0)
@@ -192,5 +196,4 @@ for u in followed['data']:
         p = p + 1
 
 if p > 0:
-    update_db(processed)
-
+    update_db(processed, processed_file)
