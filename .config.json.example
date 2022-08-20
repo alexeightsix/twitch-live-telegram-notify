@@ -1,0 +1,8 @@
+{
+	"twitch_client_id": "",
+	"twitch_client_secret": "",
+	"twitch_redirect_uri": "http://localhost",
+	"twitch_user_name": "",
+	"telegram_api_token": "",
+	"telegram_chat_id":""
+}
