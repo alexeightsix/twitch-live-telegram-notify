@@ -171,10 +171,10 @@ root = os.path.dirname(os.path.realpath(__file__))
 
 cfg = config(root + '/config.json')
 api = twitch_api(cfg['twitch_client_id'],
-                 cfg['twitch_client_secret'], cfg['twitch_redirect_uri'], root + '/.twitch_token.json')
+                 cfg['twitch_client_secret'], cfg['twitch_redirect_uri'], root + '/twitch_token.json')
 user = api.get_user(cfg['twitch_user_name'])
 followed = api.get_user_followed_streams(user['id'])
-processed_file = root + '/.processed.json'
+processed_file = root + '/processed.json'
 processed = get_processed_posts(processed_file)
 
 
